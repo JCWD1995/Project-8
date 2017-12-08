@@ -1,0 +1,184 @@
+#!/usr/bin/perl
+
+## Assignment: CIS 140 Project 8
+## Author: William Dole
+## Version: 1.0
+## Purpose: Delete users and archive their files
+
+use 5.22.1;
+use warnings;
+use File::Copy;
+use File::Path qw(make_path);
+
+my (@delUsers,@allUsers);
+my ($delUser,$continue,$archiveTo,$archiveFrom);
+
+use constant YES => 1;
+use constant COLUMNS => 2;
+use constant FILEIN => @ARGV;
+use constant FILEOUT => @ARGV;
+
+sub main {
+        readUsers();
+        setContinue();
+        while ($continue == YES) {
+                resetVariables();
+                printUserList();
+                askUser();
+                testUser();
+                updateVariables();
+                makePath();
+                archiveFiles();
+                removeUser();
+                updateArray();
+                populateArray();
+                setContinue();
+        }
+        printInfo();
+        updateCSV();
+}
+
+main();
+
+sub readUsers {
+        my $IN;
+        my $counter = 0;
+        my @tempData = ();
+        @allUsers = ();
+        open ($IN, '<', FILEIN);
+        while (<$IN>) {
+                @tempData = split(/,/);
+                for (my $i = 0; $i < COLUMNS; $i++) {
+                        chomp ($allUsers[$counter][$i] = $tempData[$i]);
+                }
+                $counter++;
+        }
+        close $IN;
+}
+
+sub setContinue {
+        if (defined $continue) {
+                $continue = -1;
+                while ($continue !~ /[0-9]/ || $continue > 1 || $continue < 0) {
+                        print "Do you want to delete anyone else?\n";
+                        print "Enter 1 for yes and 0 for no.\n";
+                        chomp ($continue = <STDIN>);
+                        if ($continue !~ /[0-9]/ || $continue > 1 || $continue < 0) {
+                                print "\nINVALID INPUT\n";
+                                sleep 2;
+                                system ("clear");
+                        }
+                }
+        } else {
+                $continue = 1;
+        }
+}
+
+sub resetVariables {
+        $delUser = ();
+        $archiveFrom = ();
+        $archiveTo = ();
+}
+
+sub printUserList {
+        my $size = @allUsers;
+        my $counter = 1;
+        for (my $i = 0; $i < $size; $i++) {
+                say "$counter\t$allUsers[$i]";
+                $counter++;
+        }
+}
+
+sub askUser {
+        print "Which user would you like to remove?\n";
+        chomp ($delUser = <STDIN>);
+        updateVariables();
+}
+
+sub updateVariables {
+        $archiveTo = "/home/archived/$delUser.zip";
+}
+
+sub testUser {
+        my $size = @allUsers;
+        for (my $i = 0; $i < $size; $i++) {
+                if ($allUsers[$i][0] eq $delUser) {
+                        $archiveFrom = $allUsers[$i][1];
+                }
+        }
+        if (!defined $archiveFrom) {
+                say "INVALID USER";
+        }
+}
+
+sub makePath {
+        if (! -d $archiveTo) {
+                make_path $archiveTo;
+        }
+}
+
+sub archiveFiles {
+        move($archiveFrom, $archiveTo) or print "Archiving has failed. Please try again." and sleep 3 and askUser();
+}
+
+sub removeUser {
+        system ("userdel $delUser");
+}
+
+sub populateArray {
+        my $i = 0;
+        while (defined $delUsers[$i][0]) {
+                $i++;
+        }
+        if (defined $archiveFrom) {
+                $delUsers[$i][0] = $delUser;
+                $delUsers[$i][1] = $archiveTo;
+        }
+}
+
+sub printInfo {
+        my $i = 0;
+        system ("clear");
+        while (defined $delUsers[$i][0]) {
+                print "$delUsers[$i][0] has been deleted.\n";
+                print "$delUsers[$i][0]\'s files has been archived at $delUsers[$i][1].\n";
+                $i++;
+        }
+}
+
+sub updateArray {
+        my $size = @allUsers;
+        my @newUserArray;
+        my $j = 0;
+        for (my $i = 0; $i < $size; $i++) {
+                if ($allUsers[$i][0] = $delUser) {
+                        $allUsers[$i][0] = ();
+                        $allUsers[$i][1] = ();
+                }
+        }
+        for (my $i = 0; $i < $size; $i++) {
+                if (defined $allUsers[$i][0]) {
+                        $newUserArray[$j][0] = $allUsers [$i][0];
+                        $newUserArray[$j][1] = $allUsers [$i][1];
+                        $j++;
+                }
+        }
+        @allUsers = @newUserArray;
+}
+
+sub updateCSV {
+        my $OUT;
+        my $size = @allUsers;
+        open ($OUT, '>', FILEOUT);
+        for (my $m = 0; $m < $size; $m++) {
+                for (my $n = 0; $n < COLUMNS; $n++) {
+                        if ($n < COLUMNS) {
+                                print ($OUT "$allUsers[$m][$n],");
+                        } else {
+                                print ($OUT "$allUsers[$m][$n]");
+                        }
+                }
+                print ($OUT "\n");
+        }
+        close $OUT;
+}
